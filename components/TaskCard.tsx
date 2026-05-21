@@ -28,7 +28,7 @@ const priorityConfig: Record<Priority, { label: string; classes: string; dot: st
 
 function formatDate(dateStr: string) {
   if (!dateStr) return '';
-  const [y, m, d] = dateStr.split('-');
+  const [, m, d] = dateStr.split('-');
   return `${m}/${d}`;
 }
 
