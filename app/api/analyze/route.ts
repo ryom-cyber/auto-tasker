@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { v4 as uuidv4 } from 'uuid';
 import { Task } from '@/lib/types';
 
@@ -37,19 +37,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '議事録テキストを入力してください' }, { status: 400 });
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    // APIキー未設定時はモックデータを返す
     await new Promise((r) => setTimeout(r, 1500));
     return NextResponse.json({
       tasks: MOCK_TASKS.map((t) => ({ ...t, id: uuidv4() })),
     });
   }
 
-  const client = new OpenAI({ apiKey });
   const today = new Date().toISOString().split('T')[0];
 
-  const systemPrompt = `あなたは議事録からタスクを抽出する専門AIです。
+  const prompt = `あなたは議事録からタスクを抽出する専門AIです。
 今日の日付は ${today} です。
 
 以下のルールに従ってJSON形式でタスクを抽出してください:
@@ -59,19 +57,21 @@ export async function POST(req: NextRequest) {
 - 優先度(priority): 「高」「中」「低」の3段階（「至急」「なるはや」→高、明示なし→中）
 - ステータス(status): 常に「未着手」
 
-必ず以下のJSONスキーマで返してください:
-{"tasks": [{"title": string, "assignee": string, "dueDate": string, "priority": "高"|"中"|"低", "status": "未着手"}]}`;
+必ず以下のJSONスキーマのみを返してください（説明文不要）:
+{"tasks": [{"title": string, "assignee": string, "dueDate": string, "priority": "高"|"中"|"低", "status": "未着手"}]}
 
-  const response = await client.chat.completions.create({
-    model: 'gpt-4o-mini',
-    response_format: { type: 'json_object' },
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: `以下の議事録からタスクを抽出してください:\n\n${text}` },
-    ],
+以下の議事録からタスクを抽出してください:
+
+${text}`;
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-1.5-flash',
+    generationConfig: { responseMimeType: 'application/json' },
   });
 
-  const content = response.choices[0].message.content ?? '{}';
+  const result = await model.generateContent(prompt);
+  const content = result.response.text();
   const parsed = JSON.parse(content);
   const rawTasks = parsed.tasks ?? [];
 
