@@ -2,6 +2,7 @@
 
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 import { useTaskStore } from '@/lib/store';
+import { supabase } from '@/lib/supabase';
 import { Status } from '@/lib/types';
 import KanbanColumn from './KanbanColumn';
 
@@ -10,10 +11,17 @@ const COLUMNS: Status[] = ['未着手', '進行中', '完了'];
 export default function KanbanBoard() {
   const { tasks, moveTask } = useTaskStore();
 
-  const onDragEnd = (result: DropResult) => {
+  const onDragEnd = async (result: DropResult) => {
     if (!result.destination) return;
     const newStatus = result.destination.droppableId as Status;
-    moveTask(result.draggableId, newStatus);
+    const taskId = result.draggableId;
+
+    moveTask(taskId, newStatus);
+
+    await supabase
+      .from('tasks')
+      .update({ status: newStatus })
+      .eq('id', taskId);
   };
 
   return (
